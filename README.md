@@ -14,9 +14,10 @@ Production-style full-stack Spring Boot application for scheduling branch appoin
 - Java 21
 - Spring Boot 3.3
 - Spring Web, Spring Data JPA, Validation, Thymeleaf
-- H2 database
+- H2 (local default profile)
+- PostgreSQL (Docker profile)
 - Maven Wrapper
-- Docker (multi-stage build)
+- Docker + Docker Compose
 
 ## API Overview
 - `GET /api/branches` - list branches
@@ -26,65 +27,72 @@ Production-style full-stack Spring Boot application for scheduling branch appoin
 - `PATCH /api/appointments/{appointmentId}/cancel` - cancel appointment
 - `GET /api/customers/{customerId}/appointments` - customer appointment history
 
-## Build and Run (Local)
+## Quick Test (Recommended First)
 ```powershell
-.\mvnw.cmd clean test
+.\mvnw.cmd test
+```
+
+## Run Locally (H2)
+```powershell
 .\mvnw.cmd spring-boot:run
 ```
 
 Application URLs:
 - UI: `http://localhost:8080/`
 - H2 console: `http://localhost:8080/h2-console`
-  - JDBC URL: `jdbc:h2:file:./data/appointments;MODE=PostgreSQL;DB_CLOSE_ON_EXIT=FALSE`
-  - User: `sa`
-  - Password: *(blank)*
 
-## Test
+## Run with Docker Compose (App + PostgreSQL)
 ```powershell
-.\mvnw.cmd test
+docker compose up --build
 ```
 
-## Test Without Local Maven (Docker)
+Then open:
+- UI: `http://localhost:8080/`
+
+Stop services:
 ```powershell
-docker run --rm -v "${PWD}:/workspace" -w /workspace maven:3.9.9-eclipse-temurin-21 mvn -q test
+docker compose down
 ```
 
-## Run with Docker
+Stop + remove DB volume:
+```powershell
+docker compose down -v
+```
+
+## Run with Docker (App only)
+This mode uses the default app profile (H2) and does not start PostgreSQL.
+
 ```powershell
 docker build -t appointment-booking-system .
 docker run --rm -p 8080:8080 appointment-booking-system
 ```
 
-## Troubleshooting
-- If IntelliJ shows unresolved Spring/JUnit imports, refresh Maven project after wrapper generation.
-- If wrapper download fails once on Windows temp folder permissions, clear stale temp dirs and retry:
+## IntelliJ Red Errors Fix
+If you still see red imports (Spring/JUnit), it is usually IDE indexing/dependency sync.
+
+1. In Maven tool window, click **Reload All Maven Projects**.
+2. Ensure SDK is Java 21 in Project Structure.
+3. Run this once in terminal to force dependency resolution:
 ```powershell
-Get-ChildItem "$env:TEMP" -Filter "tmp*.tmp.dir" -Directory | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-.\mvnw.cmd test
+.\mvnw.cmd -U clean test
 ```
+4. If still red: `File -> Invalidate Caches -> Invalidate and Restart`.
 
 ## Documentation
 - Design and decisions: `ARCHITECTURE.md`
 - Version history: `CHANGELOG.md`
 
-## Design Notes
-- Layered architecture: controller -> service -> repository
-- Validation and centralized API error handling via `@RestControllerAdvice`
-- Slot generation enforces branch hours and interval alignment
-- Conflict checking prevents duplicate active bookings per branch and slot
-
-## Suggested Production Hardening
-- Replace H2 with PostgreSQL and Flyway migrations
-- Add authentication/authorization for admin actions
-- Emit confirmations to async queue (e.g., Kafka/RabbitMQ)
-- Add observability (Micrometer + tracing + dashboards)
-
 ## Publish to GitHub
+Repository is already initialized locally on branch `main`.
+
 ```powershell
-git init
-git add .
-git commit -m "feat: initial production-grade appointment booking system"
-git branch -M main
+Set-Location "C:\Users\QXZ5GIQ\IdeaProjects\AppointmentBookingSystem"
 git remote add origin https://github.com/<your-username>/<your-repo>.git
+git push -u origin main
+```
+
+If remote already exists:
+```powershell
+git remote set-url origin https://github.com/<your-username>/<your-repo>.git
 git push -u origin main
 ```
