@@ -80,5 +80,14 @@ If you still see red imports (Spring/JUnit), it is usually IDE indexing/dependen
 
 ## Documentation
 - Design and decisions: `ARCHITECTURE.md`
+- Version history: `CHANGELOG.md`
 
+## Changelog
+- See full release history in `CHANGELOG.md`.
 
+## Publish to GitHub
+Repository is already initialized locally on branch `main`.
+
+```powershell
+git push
+```
