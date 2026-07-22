@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Appointment Booking System</title>
+    <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+<div class="container">
+    <h1>Appointment Booking</h1>
+    <p class="subtitle">Book a branch appointment and receive a simulated confirmation message.</p>
+
+    <section class="card">
+        <h2>Book Appointment</h2>
+        <form id="booking-form">
+            <div class="grid">
+                <label>Branch
+                    <select id="branch" required></select>
+                </label>
+                <label>Date
+                    <input type="date" id="date" required>
+                </label>
+                <label>Available Slot
+                    <select id="slot" required>
+                        <option value="">Select date first</option>
+                    </select>
+                </label>
+                <label>Full Name
+                    <input type="text" id="name" required>
+                </label>
+                <label>Email
+                    <input type="email" id="email" required>
+                </label>
+                <label>Phone
+                    <input type="text" id="phone" required>
+                </label>
+            </div>
+            <button type="submit">Book Now</button>
+        </form>
+    </section>
+
+    <section class="card">
+        <h2>Latest Confirmation</h2>
+        <pre id="confirmation">No appointment booked yet.</pre>
+    </section>
+</div>
+<script src="/js/app.js"></script>
+</body>
+</html>
+
