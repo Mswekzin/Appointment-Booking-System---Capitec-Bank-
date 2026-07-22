@@ -80,19 +80,5 @@ If you still see red imports (Spring/JUnit), it is usually IDE indexing/dependen
 
 ## Documentation
 - Design and decisions: `ARCHITECTURE.md`
-- Version history: `CHANGELOG.md`
 
-## Publish to GitHub
-Repository is already initialized locally on branch `main`.
 
-```powershell
-Set-Location "C:\Users\QXZ5GIQ\IdeaProjects\AppointmentBookingSystem"
-git remote add origin https://github.com/<your-username>/<your-repo>.git
-git push -u origin main
-```
-
-If remote already exists:
-```powershell
-git remote set-url origin https://github.com/<your-username>/<your-repo>.git
-git push -u origin main
-```
