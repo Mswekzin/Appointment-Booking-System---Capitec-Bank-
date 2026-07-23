@@ -37,6 +37,31 @@ Production-style full-stack Spring Boot application for scheduling branch appoin
 .\mvnw.cmd spring-boot:run
 ```
 
+### Enable Real Email Confirmations (SMTP)
+Set these properties (env vars or `application.yml`) to send real emails after booking:
+
+- `APP_NOTIFICATIONS_MAIL_ENABLED=true`
+- `APP_NOTIFICATIONS_MAIL_FROM=your-email@example.com`
+- `SPRING_MAIL_HOST=smtp.gmail.com`
+- `SPRING_MAIL_PORT=587`
+- `SPRING_MAIL_USERNAME=your-email@example.com`
+- `SPRING_MAIL_PASSWORD=your-app-password`
+- `SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH=true`
+- `SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE=true`
+
+Example (PowerShell):
+```powershell
+$env:APP_NOTIFICATIONS_MAIL_ENABLED="true"
+$env:APP_NOTIFICATIONS_MAIL_FROM="your-email@example.com"
+$env:SPRING_MAIL_HOST="smtp.gmail.com"
+$env:SPRING_MAIL_PORT="587"
+$env:SPRING_MAIL_USERNAME="your-email@example.com"
+$env:SPRING_MAIL_PASSWORD="your-app-password"
+$env:SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH="true"
+$env:SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE="true"
+.\mvnw.cmd spring-boot:run
+```
+
 Application URLs:
 - UI: `http://localhost:8080/`
 - H2 console: `http://localhost:8080/h2-console`
