@@ -49,5 +49,18 @@ class AppointmentServiceTest {
                 startsAt
         )));
     }
-}
 
+    @Test
+    void rejectSlotWithSecondsPrecisionToPreventBypass() {
+        Branch branch = branchRepository.save(new Branch("Precision Branch", "456 Clock Ave", LocalTime.of(9, 0), LocalTime.of(17, 0), 30));
+        LocalDateTime invalidStart = LocalDateTime.now().plusDays(1).withHour(10).withMinute(0).withSecond(30).withNano(0);
+
+        assertThrows(IllegalArgumentException.class, () -> appointmentService.createAppointment(new CreateAppointmentRequest(
+                branch.getId(),
+                "Precision User",
+                "precision@example.com",
+                "+12025550999",
+                invalidStart
+        )));
+    }
+}

@@ -9,7 +9,10 @@ import java.util.List;
 
 public interface AppointmentRepository extends JpaRepository<Appointment, Long> {
 
-    boolean existsByBranchIdAndStartsAtAndStatus(Long branchId, LocalDateTime startsAt, AppointmentStatus status);
+    boolean existsByBranchIdAndStatusAndStartsAtLessThanAndEndsAtGreaterThan(Long branchId,
+                                                                              AppointmentStatus status,
+                                                                              LocalDateTime proposedEnd,
+                                                                              LocalDateTime proposedStart);
 
     List<Appointment> findByCustomerIdOrderByStartsAtAsc(Long customerId);
 
@@ -18,4 +21,3 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
                                                                 LocalDateTime endsAt,
                                                                 AppointmentStatus status);
 }
-

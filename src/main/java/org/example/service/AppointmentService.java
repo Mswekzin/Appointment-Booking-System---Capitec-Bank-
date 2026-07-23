@@ -61,7 +61,9 @@ public class AppointmentService {
         while (!cursor.plusMinutes(branch.getSlotMinutes()).isAfter(closeAt)) {
             LocalDateTime slotEnd = cursor.plusMinutes(branch.getSlotMinutes());
             LocalDateTime slotStart = cursor;
-            boolean booked = existing.stream().anyMatch(a -> a.getStartsAt().equals(slotStart));
+            boolean booked = existing.stream()
+                    .anyMatch(a -> a.getStartsAt().isBefore(slotEnd) && a.getEndsAt().isAfter(slotStart));
+
             if (!booked && slotStart.isAfter(LocalDateTime.now())) {
                 slots.add(new AvailableSlotResponse(slotStart, slotEnd));
             }
@@ -78,8 +80,15 @@ public class AppointmentService {
 
         validateSlot(branch, request.startsAt());
 
-        boolean occupied = appointmentRepository.existsByBranchIdAndStartsAtAndStatus(
-                branch.getId(), request.startsAt(), AppointmentStatus.BOOKED);
+        LocalDateTime appointmentStart = request.startsAt();
+        LocalDateTime appointmentEnd = appointmentStart.plusMinutes(branch.getSlotMinutes());
+
+        boolean occupied = appointmentRepository.existsByBranchIdAndStatusAndStartsAtLessThanAndEndsAtGreaterThan(
+                branch.getId(),
+                AppointmentStatus.BOOKED,
+                appointmentEnd,
+                appointmentStart
+        );
         if (occupied) {
             throw new BookingConflictException("Selected slot is already booked");
         }
@@ -94,8 +103,8 @@ public class AppointmentService {
         Appointment appointment = new Appointment(
                 branch,
                 customer,
-                request.startsAt(),
-                request.startsAt().plusMinutes(branch.getSlotMinutes())
+                appointmentStart,
+                appointmentEnd
         );
         Appointment saved = appointmentRepository.save(appointment);
         confirmationService.sendConfirmation(saved);
@@ -136,6 +145,11 @@ public class AppointmentService {
             throw new IllegalArgumentException("Appointment must be in the future");
         }
 
+        // Force exact slot boundaries (e.g., 10:00:00.000) to avoid bypassing checks with seconds/nanos.
+        if (startsAt.getSecond() != 0 || startsAt.getNano() != 0) {
+            throw new IllegalArgumentException("Selected slot must be on exact minute boundaries");
+        }
+
         LocalTime localTime = startsAt.toLocalTime();
         if (localTime.isBefore(branch.getOpenTime()) || !localTime.isBefore(branch.getCloseTime())) {
             throw new IllegalArgumentException("Selected slot is outside branch working hours");
@@ -148,4 +162,3 @@ public class AppointmentService {
         }
     }
 }
-
