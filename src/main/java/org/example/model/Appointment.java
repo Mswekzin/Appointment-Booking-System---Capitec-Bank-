@@ -8,6 +8,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -15,7 +16,13 @@ import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "appointments")
+@Table(
+    name = "appointments",
+    indexes = {
+        @Index(name = "idx_appt_branch_starts", columnList = "branch_id, starts_at"),
+        @Index(name = "idx_appt_customer",      columnList = "customer_id")
+    }
+)
 public class Appointment {
 
     @Id
@@ -108,4 +115,3 @@ public class Appointment {
         this.confirmationSentAt = confirmationSentAt;
     }
 }
-

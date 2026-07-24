@@ -12,7 +12,11 @@ import org.example.model.Customer;
 import org.example.repository.AppointmentRepository;
 import org.example.repository.BranchRepository;
 import org.example.repository.CustomerRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
@@ -23,6 +27,8 @@ import java.util.List;
 
 @Service
 public class AppointmentService {
+
+    private static final Logger logger = LoggerFactory.getLogger(AppointmentService.class);
 
     private final BranchRepository branchRepository;
     private final CustomerRepository customerRepository;
@@ -45,21 +51,17 @@ public class AppointmentService {
                 .orElseThrow(() -> new NotFoundException("Branch not found"));
 
         LocalDateTime dayStart = date.atStartOfDay();
-        LocalDateTime dayEnd = date.atTime(LocalTime.MAX);
+        LocalDateTime dayEnd   = date.atTime(LocalTime.MAX);
 
-        List<Appointment> existing = appointmentRepository.findByBranchIdAndStartsAtBetweenAndStatus(
-                branchId,
-                dayStart,
-                dayEnd,
-                AppointmentStatus.BOOKED
-        );
+        List<Appointment> existing = appointmentRepository.findBookedForBranchOnDay(
+                branchId, dayStart, dayEnd, AppointmentStatus.BOOKED);
 
         List<AvailableSlotResponse> slots = new ArrayList<>();
-        LocalDateTime cursor = date.atTime(branch.getOpenTime());
+        LocalDateTime cursor  = date.atTime(branch.getOpenTime());
         LocalDateTime closeAt = date.atTime(branch.getCloseTime());
 
         while (!cursor.plusMinutes(branch.getSlotMinutes()).isAfter(closeAt)) {
-            LocalDateTime slotEnd = cursor.plusMinutes(branch.getSlotMinutes());
+            LocalDateTime slotEnd   = cursor.plusMinutes(branch.getSlotMinutes());
             LocalDateTime slotStart = cursor;
             boolean booked = existing.stream()
                     .anyMatch(a -> a.getStartsAt().isBefore(slotEnd) && a.getEndsAt().isAfter(slotStart));
@@ -69,59 +71,66 @@ public class AppointmentService {
             }
             cursor = slotEnd;
         }
-
         return slots;
     }
 
-    @Transactional
+    /**
+     * SERIALIZABLE isolation + PESSIMISTIC_WRITE lock inside hasOverlappingBooking
+     * guarantees that two concurrent requests for the same slot cannot both succeed.
+     */
+    @Transactional(isolation = Isolation.SERIALIZABLE)
     public AppointmentResponse createAppointment(CreateAppointmentRequest request) {
-        Branch branch = branchRepository.findById(request.branchId())
-                .orElseThrow(() -> new NotFoundException("Branch not found"));
+        try {
+            Branch branch = branchRepository.findById(request.branchId())
+                    .orElseThrow(() -> new NotFoundException("Branch not found"));
 
-        validateSlot(branch, request.startsAt());
+            validateSlot(branch, request.startsAt());
 
-        LocalDateTime appointmentStart = request.startsAt();
-        LocalDateTime appointmentEnd = appointmentStart.plusMinutes(branch.getSlotMinutes());
+            LocalDateTime appointmentStart = request.startsAt();
+            LocalDateTime appointmentEnd   = appointmentStart.plusMinutes(branch.getSlotMinutes());
 
-        boolean occupied = appointmentRepository.existsByBranchIdAndStatusAndStartsAtLessThanAndEndsAtGreaterThan(
-                branch.getId(),
-                AppointmentStatus.BOOKED,
-                appointmentEnd,
-                appointmentStart
-        );
-        if (occupied) {
-            throw new BookingConflictException("Selected slot is already booked");
+            boolean occupied = appointmentRepository.hasOverlappingBooking(
+                    branch.getId(),
+                    AppointmentStatus.BOOKED,
+                    appointmentEnd,
+                    appointmentStart
+            );
+            if (occupied) {
+                throw new BookingConflictException("Selected slot is already booked. Please choose another time.");
+            }
+
+            Customer customer = customerRepository.findByEmailIgnoreCase(request.customerEmail())
+                    .orElseGet(() -> customerRepository.save(new Customer(
+                            request.customerName().trim(),
+                            request.customerEmail().trim().toLowerCase(),
+                            request.customerPhone().trim()
+                    )));
+
+            Appointment appointment = new Appointment(branch, customer, appointmentStart, appointmentEnd);
+            Appointment saved = appointmentRepository.save(appointment);
+            confirmationService.sendConfirmation(saved);
+
+            logger.info("Appointment created id={} branch={} startsAt={} customer={}",
+                    saved.getId(), branch.getName(), appointmentStart, customer.getEmail());
+
+            return AppointmentResponse.from(saved);
+
+        } catch (DataIntegrityViolationException ex) {
+            // Last-resort safety net: DB-level constraint violation from concurrent insert
+            logger.warn("Concurrent booking conflict caught at DB level: {}", ex.getMessage());
+            throw new BookingConflictException("Selected slot was just taken. Please choose another time.");
         }
-
-        Customer customer = customerRepository.findByEmailIgnoreCase(request.customerEmail())
-                .orElseGet(() -> customerRepository.save(new Customer(
-                        request.customerName().trim(),
-                        request.customerEmail().trim().toLowerCase(),
-                        request.customerPhone().trim()
-                )));
-
-        Appointment appointment = new Appointment(
-                branch,
-                customer,
-                appointmentStart,
-                appointmentEnd
-        );
-        Appointment saved = appointmentRepository.save(appointment);
-        confirmationService.sendConfirmation(saved);
-
-        return AppointmentResponse.from(saved);
     }
 
     @Transactional(readOnly = true)
     public AppointmentResponse getAppointment(Long appointmentId) {
-        Appointment appointment = appointmentRepository.findById(appointmentId)
-                .orElseThrow(() -> new NotFoundException("Appointment not found"));
-        return AppointmentResponse.from(appointment);
+        return AppointmentResponse.from(appointmentRepository.findById(appointmentId)
+                .orElseThrow(() -> new NotFoundException("Appointment not found")));
     }
 
     @Transactional(readOnly = true)
     public List<AppointmentResponse> getAppointmentsByCustomer(Long customerId) {
-        return appointmentRepository.findByCustomerIdOrderByStartsAtAsc(customerId)
+        return appointmentRepository.findByCustomerIdOrderByStartsAtDesc(customerId)
                 .stream()
                 .map(AppointmentResponse::from)
                 .toList();
@@ -137,6 +146,7 @@ public class AppointmentService {
         }
 
         appointment.cancel();
+        logger.info("Appointment cancelled id={}", appointmentId);
         return AppointmentResponse.from(appointment);
     }
 
@@ -145,7 +155,6 @@ public class AppointmentService {
             throw new IllegalArgumentException("Appointment must be in the future");
         }
 
-        // Force exact slot boundaries (e.g., 10:00:00.000) to avoid bypassing checks with seconds/nanos.
         if (startsAt.getSecond() != 0 || startsAt.getNano() != 0) {
             throw new IllegalArgumentException("Selected slot must be on exact minute boundaries");
         }
