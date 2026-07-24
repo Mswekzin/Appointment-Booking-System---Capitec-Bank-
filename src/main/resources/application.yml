@@ -33,3 +33,9 @@ logging:
     org.example: INFO
 
 
+
+app:
+  security:
+    jwt:
+      secret: ${JWT_SECRET:AppointEase-Super-Secret-Key-Must-Be-At-Least-256-Bits-Long-2024}
+      expiration-ms: ${JWT_EXPIRATION_MS:3600000}
